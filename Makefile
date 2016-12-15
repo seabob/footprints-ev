@@ -11,4 +11,4 @@ MemoryPool.o:FULMemoryPool/MemoryPool.c FULMemoryPool/MemoryPool.h
 threadpool.o:threadpool/threadpool.c threadpool/threadpool.h
 	$(CC) -c threadpool/threadpool.c
 clean:
-	rm -rf server  *.o
+	rm -rf server client  *.o

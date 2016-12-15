@@ -26,7 +26,7 @@ static inline void network_address_init(network_t *network)
 {
 	bzero(&network->address,sizeof(network->address));
 	network->address.sin_family = AF_INET;
-	network->address.sin_addr.s_addr = inet_addr("127.0.0.1");
+	network->address.sin_addr.s_addr = inet_addr("192.168.0.115");
 	network->address.sin_port = htons(SERVER_PORT);
 }
 

@@ -36,7 +36,7 @@ pthread_mutex_t mem_lock;
 
 static long count = 0;
 void OBD_decode_thread(void *);
-void* thread_func_cb(void *data);
+void* thread_func_cb(void *);
 
 static void free_libev(struct ev_loop *loop,int fd)
 {
@@ -79,16 +79,16 @@ void OBD_response_thread(OBD_t *data)
 void read_func_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 {
 	ssize_t read;
-	char buffer[BUF_SIZE] = {0};
-//	OBD_t *obd = Malloc(obd_pool);
-//	obd->data = Malloc(data_pool);
-//	memset(obd->data,0,BUF_SIZE);
+//	char buffer[BUF_SIZE] = {0};
+	OBD_t *obd = Malloc(obd_pool);
+	obd->data = Malloc(data_pool);
+	memset(obd->data,0,BUF_SIZE);
 	if(EV_ERROR & revents)
 	{
 		printf("%s:%d\n",__func__,__LINE__);
 		return;
 	}
-	read = recv(w->fd,buffer,BUF_SIZE,0);
+	read = recv(w->fd,obd->data,BUF_SIZE,0);
 	if(read < 0)
 	{
 		printf("%s:%d\n",__func__,__LINE__);
@@ -101,14 +101,16 @@ void read_func_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 		return;
 	}else
 	{
-		buffer[read] = '\0';
+		obd->data[read] = '\0';
 	}
-	printf("buffer = %s\n",buffer);
+//	printf("obd->data = %s\n",obd->data);
 //	obd->data[read] = '\0';
 //	obd->fd = w->fd;
 	send(w->fd,"OK",strlen("OK"),0);
+//	threadpool_add(thread_pool,OBD_decode_thread,(void*)obd,0);
 //	OBD_response_thread(obd);
-//	list_init(&obd->list);
+	list_init(&obd->list);
+	mq_put(&obd_mq,&obd->list);
 //	printf("put data = %s\n",(char*)obd->data);
 //	Free(data_pool,obd->data);
 //	Free(obd_pool,obd);
@@ -177,9 +179,12 @@ void* thread_func_cb(void *data)
 		}
 		o = list_entry(list,OBD_t,list);
 		if(!o)
+		{
 			printf("o is NULL\n");
-//		threadpool_add(thread_pool,OBD_decode_thread,(void*)o,0);
-		OBD_decode_thread(o);
+			continue;
+		}
+		threadpool_add(thread_pool,OBD_decode_thread,(void*)o,0);
+//		OBD_decode_thread((void*)o);
 	}
 	return (void*)NULL;
 }
@@ -219,8 +224,8 @@ int main(int argv, char **argc)
 		Free(obd_pool,obd[i]);
 	}
 #endif
-//	thread_pool = threadpool_create(8,128,0);
-//	pthread_create(&thread,NULL,thread_func_cb,NULL);
+	thread_pool = threadpool_create(8,128,0);
+	pthread_create(&thread,NULL,thread_func_cb,NULL);
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = inet_addr("0.0.0.0");

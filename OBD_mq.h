@@ -68,7 +68,7 @@ static inline list_t* mq_get(mq_t *mq)
 	current =  list_del_back(&mq->list);
 	if(current)
 		mq->size--;
-	printf("GET size = %d\n",mq->size);
+//	printf("GET size = %d\n",mq->size);
 //	pthread_cond_signal(&mq_cond);
 	pthread_mutex_unlock(&mq_mutex);
 	return current;
@@ -88,9 +88,9 @@ static inline void mq_put(mq_t *mq, list_t *current)
 	list_add_front(&mq->list,current);
 	mq->size++;
 //	pthread_cond_signal(&mq_cond);
-	printf("PUT size = %d\n",mq->size);
+//	printf("PUT size = %d\n",mq->size);
 	pthread_mutex_unlock(&mq_mutex);
-	printf("aba\n");
+//	printf("aba\n");
 }
 
 static inline void mq_release(mq_t *mq)

@@ -46,7 +46,7 @@ static void thread_func(void *data)
 		send(net->socket,sendbuf,sizeof("AA000000BB8111F101EE"),0);
 		ret = recv(net->socket,buffer,512,0);
 		buffer[ret] = '\0';
-		printf("%s\n",buffer);
+//		printf("%s\n",buffer);
 	}
 //	printf("fd[%d] = %s\n",net->socket,buffer);
 	close(net->socket);
@@ -54,7 +54,7 @@ static void thread_func(void *data)
 	return ;
 
 }
-#define THREAD_NUM	2
+#define THREAD_NUM	5
 int main(int argv, char **argc)
 {
 	pthread_t t[THREAD_NUM];
