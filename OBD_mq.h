@@ -45,8 +45,16 @@ static inline void list_init(list_t *list)
 
 static inline boolean mq_is_empty(mq_t *mq)
 {
+	pthread_mutex_lock(&mq_mutex);
+	boolean flag;
 	list_t *head = &mq->list;
 	return head->prev==head?TRUE:FALSE;
+	if(head->prev == head)
+		flag = TRUE;
+	else
+		flag = FALSE;
+	pthread_mutex_unlock(&mq_mutex);
+	return flag;
 }
 
 static inline list_t* list_del_back(list_t *head)

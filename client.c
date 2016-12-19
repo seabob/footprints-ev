@@ -34,16 +34,17 @@ static void thread_func(void *data)
 
 	connect(net->socket,(struct sockaddr*)&net->address,sizeof(net->address));
 		printf("%s:%d\n",__func__,__LINE__);
-	for(i = 0; i < 10000;i++)
+//	for(i = 0; i < 10000;i++)
 	{
-	//	usleep(10);
+		usleep(1);
 		memset(sendbuf,0,512);
 		memset(buffer,0,512);
-		sprintf(sendbuf,"AA111111BB8111F11%dEE",j);
+//		sprintf(sendbuf,"AA111111BB8111F%d11EE",j);
+		sprintf(sendbuf,"BBF1AA0B03AA0A04AA0E05EE");
 		j++;
 		if(j == 10)
 			j=1;
-		send(net->socket,sendbuf,sizeof("AA000000BB8111F101EE"),0);
+		send(net->socket,sendbuf,sizeof(sendbuf),0);
 		ret = recv(net->socket,buffer,512,0);
 		buffer[ret] = '\0';
 //		printf("%s\n",buffer);
@@ -54,7 +55,7 @@ static void thread_func(void *data)
 	return ;
 
 }
-#define THREAD_NUM	5
+#define THREAD_NUM	1
 int main(int argv, char **argc)
 {
 	pthread_t t[THREAD_NUM];
