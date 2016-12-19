@@ -57,6 +57,13 @@ static inline boolean mq_is_empty(mq_t *mq)
 	return flag;
 }
 
+static inline void list_del(list_t *head,list_t *node)
+{
+	node->next->prev = node->prev;
+	head->next = node->next;
+	list_init(node);
+}
+
 static inline list_t* list_del_back(list_t *head)
 {
 	if(head->prev == head)

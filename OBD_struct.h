@@ -17,21 +17,13 @@ typedef unsigned char	boolean;
 #define FALSE	0
 #endif
 
-#define BUF_ZIZE	512
+#define BUF_SIZE	512
 typedef struct obd_struct{
-	char	data[BUF_ZIZE];
-	void	*response;
-	char	*sql;
-	char	*redis;
-	int	fd;
-	boolean (*init)(struct obd_struct*);
-	u8_t (*get_cmd)(struct obd_struct*);
-	void (*filter_escape)(struct obd_struct*);
-	boolean	(*check_sum)(struct obd_struct*);
-	char* (*pack_to_sql)(struct obd_struct*);
-	char* (*pack_to_redis)(struct obd_struct*);
+	char	data[BUF_SIZE];
 	list_t	list;
 }OBD_t;
+
+MemoryPool_t *obd_pool;
 
 static inline u8_t OBD_get_cmd(OBD_t *obd)
 {
@@ -76,14 +68,24 @@ static inline boolean OBD_check_sum(OBD_t* obd)
 	return FALSE;
 }
 
-static inline void OBD_init(OBD_t *obd, void *buf)
+static inline OBD_t* OBD_init(void)
 {
-	if(!buf)
+	OBD_t *obd = Malloc(obd_pool);
+	if(!obd)
 		return;
 	list_init(&obd->list);
-//	obd->data = (void*)buf;
+	memset(obd->data,0,BUF_SIZE);
+	return obd;
 }
 
+static inline void OBD_release(OBD_t* obd)
+{
+	if(!obd)
+		return;
+	list_init(&obd->list);
+	memset(obd->data,0,BUF_SIZE);
+	Free(obd_pool,obd);
+}
 
 static inline void OBD_decode(OBD_t *obd)
 {
