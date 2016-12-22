@@ -40,7 +40,7 @@ static void thread_func(void *data)
 		memset(sendbuf,0,512);
 		memset(buffer,0,512);
 //		sprintf(sendbuf,"AA111111BB8111F%d11EE",j);
-		sprintf(sendbuf,"BBF1AA0B03AA0A04AA0E05EE");
+		sprintf(sendbuf,"BB02123456780102030420EE");
 		j++;
 		if(j == 10)
 			j=1;

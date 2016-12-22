@@ -8,4 +8,6 @@ typedef signed char s8_t;
 typedef signed short s16_t;
 typedef signed int s32_t;
 
+#define SOCKET_ALLOC_MAX_CLIENT 20480
+#define BUF_SIZE	256
 #endif

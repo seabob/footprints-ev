@@ -24,11 +24,11 @@ void do_mysql_process(void *data)
 	}
 	CATCH(SQLException)
 	{
-		
+		printf("SQLExecution -- %s\n",Exception_frame.message);
 	}
 	FINALLY
 	{
-
+		Connection_close(connect);
 	}
 	END_TRY;
 }
