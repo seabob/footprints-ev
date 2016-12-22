@@ -24,11 +24,11 @@ typedef struct obd_struct{
 	u8_t	data[BUF_SIZE];
 	u8_t	data_length;
 	u8_t	hex[BUF_SIZE];
-	u8_t	id;
 	list_t	list;
 }OBD_t;
 
 MemoryPool_t *obd_pool;
+pthread_mutex_t mem_lock;
 
 static inline u8_t OBD_get_cmd(OBD_t *obd)
 {
@@ -99,7 +99,7 @@ static inline boolean OBD_filter_escape_and_transfer_to_hex(OBD_t* obd)
 			flag = 0;
 		}
 		obd->hex[j] = tmp;
-		printf("0x%x\n",obd->hex[j]);
+	//	printf("0x%x\n",obd->hex[j]);
 		j++;
 	}
 	return TRUE;
@@ -107,7 +107,9 @@ static inline boolean OBD_filter_escape_and_transfer_to_hex(OBD_t* obd)
 
 static inline OBD_t* OBD_init(void)
 {
+//	pthread_mutex_lock(&mem_lock);
 	OBD_t *obd = Malloc(obd_pool);
+//	pthread_mutex_unlock(&mem_lock);
 	if(!obd)
 		return;
 	list_init(&obd->list);
@@ -126,12 +128,6 @@ static inline void OBD_release(OBD_t* obd)
 	Free(obd_pool,obd);
 }
 
-static inline void OBD_decode1(OBD_t *obd)
-{
-	cmd00_t *cmd = (cmd00_t*)obd->hex;
-	printf("obd->cmd = %d\n",cmd->head.cmd);
-}
-
 static inline void OBD_decode(OBD_t *obd)
 {
 
@@ -143,12 +139,13 @@ static inline void OBD_decode(OBD_t *obd)
 			break;
 		case CMD0x02:
 		{
-			cmd02_t *cmd = (cmd02_t*)obd->hex;
+//			printf("%s\n",obd->data);
+//			cmd02_t *cmd = (cmd02_t*)obd->hex;
 //			printf("client_id len =%d\n",sizeof(cmd->head.id));
-			u8_t len = sizeof(cmd->head.id);
-			int i = 0;
-			for(i = 0; i < len; i++)
-				printf("client_id[%d] = 0x%2x\n",i,cmd->head.id[i]);
+//			u8_t len = sizeof(cmd->head.id);
+//			int i = 0;
+//			for(i = 0; i < len; i++)
+//				printf("client_id[%d] = 0x%2x\n",i,cmd->head.id[i]);
 			break;
 		}
 		case CMD0x03:
@@ -203,6 +200,14 @@ static inline void OBD_decode(OBD_t *obd)
 static inline void OBD_response(OBD_t *obd)
 {
 	
+}
+
+static inline void OBD_decode_thread(void *data)
+{
+	OBD_t *o = (OBD_t*)data;
+	OBD_filter_escape_and_transfer_to_hex(o);
+	OBD_decode(o);
+	OBD_release(o);
 }
 
 #endif

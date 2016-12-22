@@ -15,6 +15,7 @@
 #include "types_define.h"
 #include "OBD_mq.h"
 #include "OBD_struct.h"
+#include "OBD_connect_task.h"
 
 static struct ev_io *libev_list[SOCKET_ALLOC_MAX_CLIENT] = {0};
 typedef struct sockaddr_in sockaddr_in_t;
@@ -29,10 +30,9 @@ static int server_socket;
 struct ev_io socket_accept;
 struct ev_loop *loop;
 
-static mq_t obd_mq;
+//static mq_t obd_mq;
 boolean mq_flag = FALSE;
 pthread_mutex_t client_lock;
-pthread_mutex_t mem_lock;
 
 static void free_libev(struct ev_loop *loop,int fd)
 {
@@ -59,52 +59,40 @@ static void ev_signal_cb(struct ev_loop *loop,ev_signal *w,int revents)
 
 void read_func_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 {
-	ssize_t read;
-	OBD_t *obd = OBD_init();
+	ssize_t read, len;
+	char buffer[BUF_SIZE] = {0};
 	if(EV_ERROR & revents)
 	{
-		OBD_release(obd);
 		printf("%s:%d\n",__func__,__LINE__);
 		return;
 	}
-	read = recv(w->fd,obd->data,BUF_SIZE,0);
+	read = recv(w->fd,buffer,BUF_SIZE,0);
+	len = strlen(buffer);
 	if(read < 0)
 	{
-		OBD_release(obd);
 		printf("%s:%d\n",__func__,__LINE__);
 		return;
 	}
 	else if(read == 0)
 	{
-		OBD_release(obd);
 		printf("%s:%d\n",__func__,__LINE__);
-		free_libev(loop,w->fd);
+		if(connect_tasks[w->fd])
+		{
+			connect_task_destroy(connect_tasks[w->fd]);
+		}
 		return;
-	}else
-	{
-		obd->data[read] = '\0';
 	}
-
-	obd->data_length = strlen(obd->data);
-//	printf("%s:%d data_length = %d\n",__func__,__LINE__,obd->data_length);
-	if(obd->data_length == 0)
-	{
-		OBD_release(obd);
-		return ;
-	}
-
-//	if(!OBD_check_sum(obd))
-//	{
-//		send(w->fd,"ERROR",strlen("ERROR"),0);
-//		Free(data_pool,obd->data);
-//		Free(obd_pool,obd);
-//		return ;
-//	}
-
-	obd->id = OBD_get_cmd(obd);
+	buffer[len] = '\0';
 	send(w->fd,"OK",strlen("OK"),0);
-	list_init(&obd->list);
-	mq_put(&obd_mq,&obd->list);
+
+	if(len == 0)
+		return ;
+	{
+		OBD_t *obd = OBD_init();
+		memcpy(obd->data,buffer,len);
+		obd->data_length = len;
+		connect_task_put(connect_tasks[w->fd],obd);
+	}
 	
 	return;
 }
@@ -114,79 +102,75 @@ static void accept_func_cb(struct ev_loop *loop,struct ev_io *w, int revents)
 	struct sockaddr_in client_addr;
 	socklen_t client_len = sizeof(client_addr);
 	int client_socket;
-	printf("%s:%d\n",__func__,__LINE__);
-//	pthread_mutex_lock(&client_lock);
-	struct ev_io *w_client = (struct ev_io*)Malloc(ev_pool);
-//	pthread_mutex_unlock(&client_lock);
-	if(!w_client)
-	{
-		Free(ev_pool,w_client);
-		printf("%s:%d\n",__func__,__LINE__);
-		return ;
-	}
+
 	if(EV_ERROR & revents)
 	{
-		Free(ev_pool,w_client);
 		printf("%s:%d\n",__func__,__LINE__);
 		return ;	
 	}
 	client_socket= accept(w->fd,(struct sockaddr*)&client_addr,&client_len);
 	if(client_socket < 0)
 	{
-		Free(ev_pool,w_client);
 		return;
 	}
 	if(client_socket > SOCKET_ALLOC_MAX_CLIENT)
 	{
 		printf("%s:%d\n",__func__,__LINE__);
-		Free(ev_pool,w_client);
 		close(client_socket);
 		return ;
 	}
-	if(libev_list[client_socket])
+	if(connect_tasks[client_socket])
 	{
 		printf("%s:%d\n",__func__,__LINE__);
-		Free(ev_pool,w_client);
+		connect_task_destroy(connect_tasks[client_socket]);
 		return ;	
 	}
 
-	ev_io_init(w_client,read_func_cb,client_socket,EV_READ);
-	ev_io_start(loop,w_client);
-	libev_list[client_socket] = w_client;
-}
-
-void OBD_decode_thread(void *data)
-{
-	OBD_t *o = (OBD_t*)data;
-	OBD_filter_escape_and_transfer_to_hex(o);
-	printf("cmd = 0x%x\n",o->hex[1]);
-	OBD_decode(o);
-	OBD_release(o);
+	{
+		connect_task_t *task = connect_task_init(loop,client_socket);
+		if(!task)
+		{
+		printf("%s:%d\n",__func__,__LINE__);
+			close(client_socket);
+			return;
+		}
+		ev_io_init(&task->ev,read_func_cb,client_socket,EV_READ);
+		ev_io_start(loop,&task->ev);
+	}
+//	libev_list[client_socket] = w_client;
 }
 
 void* thread_func_cb(void *data)
 {
-	OBD_t *o = NULL;
-	list_t *list = NULL;
+	connect_task_t *task = NULL;
+	list_t *head = NULL;
+	int i = 0;
 	while(1)
 	{
-		if(mq_flag == TRUE && mq_is_empty(&obd_mq))
+		if(mq_flag)
 		{
+			u32_t no_empty_count = 0;
+			for(i = 0; i <SOCKET_ALLOC_MAX_CLIENT; i++)
+			{
+				task = connect_tasks[i];
+				if(task)
+					connect_task_destroy(task);
+			}
+
 			break;
-		}
-		list = mq_get(&obd_mq);
-		if(list == NULL)
+
+		}else
 		{
-			continue;
+			for(i = 0; i <SOCKET_ALLOC_MAX_CLIENT; i++)
+			{
+				task = connect_tasks[i];
+				if(task && !connect_task_is_empty(task))
+				{
+					connect_task_process((void*)task);
+		//			threadpool_add(thread_pool,connect_task_process,(void*)task,0);
+				}
+			}
 		}
-		o = list_entry(list,OBD_t,list);
-		if(!o)
-		{
-			printf("o is NULL\n");
-			continue;
-		}
-		threadpool_add(thread_pool,OBD_decode_thread,(void*)o,0);
-//		OBD_decode_thread((void*)o);
 	}
 	return (void*)NULL;
 }
@@ -198,14 +182,13 @@ int main(int argv, char **argc)
 	ev_signal signal_watcher;
 	int i =0;
 	pthread_t thread;
-	sockaddr_in_t server_addr;
-	pthread_mutex_init(&mq_mutex,NULL);
-//	pthread_cond_init(&mq_cond,NULL);
-	mq_init(&obd_mq);
-	if((ev_pool = CreateMemoryPool(sizeof(struct ev_io))) == NULL)return 1;
+	sockaddr_in_t server_addr
+	;
+//	if((ev_pool = CreateMemoryPool(sizeof(struct ev_io))) == NULL)return 1;
 	if((obd_pool = CreateMemoryPool(sizeof(OBD_t))) == NULL) return 1;
+	if((task_pool = CreateMemoryPool(sizeof(connect_task_t))) == NULL) return 1;
 
-	thread_pool = threadpool_create(8,8,0);
+//	thread_pool = threadpool_create(4,16,0);
 	pthread_create(&thread,NULL,thread_func_cb,NULL);
 
 	server_addr.sin_family = AF_INET;
@@ -230,10 +213,10 @@ int main(int argv, char **argc)
 	mq_flag = TRUE;
 	pthread_join(thread,NULL);
 	close(server_socket);
-	threadpool_destroy(thread_pool,0);
+//	threadpool_destroy(thread_pool,0);
 	DestroyMemoryPool(&obd_pool);
-	DestroyMemoryPool(&ev_pool);
-	pthread_mutex_destroy(&mq_mutex);
+	DestroyMemoryPool(&task_pool);
+//	DestroyMemoryPool(&ev_pool);
 	ev_loop_destroy(loop);
 	
 	return 0;
