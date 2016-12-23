@@ -19,7 +19,7 @@ typedef unsigned char	boolean;
 #ifndef FALSE
 #define FALSE	0
 #endif
-
+static int __cmd_count = 0;
 typedef struct obd_struct{
 	u8_t	data[BUF_SIZE];
 	u8_t	data_length;
@@ -38,12 +38,13 @@ static inline u8_t OBD_get_cmd(OBD_t *obd)
 
 #define DATA_POS_BEGIN	4
 #define DATA_POS_END	4
-static inline boolean OBD_check_sum(OBD_t* obd)
+static inline boolean OBD_checksum(u8_t* data)
 {
-	char *begin = strstr(obd->data,"BB");
-	char *end = strstr(obd->data,"EE")-2;
+	char *begin = strstr(data,"BB");
+	char *end = strstr(data,"EE")-2;
 	char *ptr = begin;
-	u8_t i = 0, j = 0, tmp = 0, flag = 0,len = 0,sum = 0;
+	u8_t i = 0, j = 0, tmp = 0, flag = 0,len = 0;
+	u32_t sum = 0;
 
 	if(!begin || !end || (end < begin))
 		return FALSE;
@@ -67,7 +68,7 @@ static inline boolean OBD_check_sum(OBD_t* obd)
 	}
 	sum %= 256;
 	tmp = str2hex(end[0],end[1]);
-	printf("sum = 0x%x tmp = 0x%x\n",sum,tmp);
+//	printf("sum = 0x%x tmp = 0x%x\n",sum,tmp);
 	if(tmp == sum)
 		return TRUE;
 	return FALSE;
@@ -99,7 +100,7 @@ static inline boolean OBD_filter_escape_and_transfer_to_hex(OBD_t* obd)
 			flag = 0;
 		}
 		obd->hex[j] = tmp;
-		printf("0x%x\n",obd->hex[j]);
+//		printf("0x%x\n",obd->hex[j]);
 		j++;
 	}
 	return TRUE;
@@ -109,7 +110,7 @@ static inline OBD_t* OBD_init(void)
 {
 	OBD_t *obd = Malloc(obd_pool);
 	if(!obd)
-		return;
+		return NULL;
 	list_init(&obd->list);
 	obd->data_length = 0;
 	memset(obd->data,0,BUF_SIZE);
@@ -123,13 +124,15 @@ static inline void OBD_release(OBD_t* obd)
 		return;
 	list_init(&obd->list);
 	memset(obd->data,0,BUF_SIZE);
+	memset(obd->hex,0,BUF_SIZE);
+	obd->data_length = 0;
 	Free(obd_pool,obd);
 }
 
 static inline void OBD_decode1(OBD_t *obd)
 {
 	cmd00_t *cmd = (cmd00_t*)obd->hex;
-	printf("obd->cmd = %d\n",cmd->head.cmd);
+//	printf("obd->cmd = %d\n",cmd->head.cmd);
 }
 
 static inline void OBD_decode(OBD_t *obd)
@@ -146,11 +149,11 @@ static inline void OBD_decode(OBD_t *obd)
 			cmd02_t *cmd = (cmd02_t*)obd->hex;
 //			printf("client_id len =%d\n",sizeof(cmd->head.id));
 			u8_t len = sizeof(cmd->head.id);
-			int i = 0;
-			for(i = 0; i < len; i++)
-				printf("client_id[%d] = 0x%2x\n",i,cmd->head.id[i]);
+			__cmd_count++;
+//			printf("[%d]: %s\n",__cmd_count,obd->data);
+//			for(i = 0; i < len; i++)
+//				printf("client_id[%d] = 0x%2x\n",i,cmd->head.id[i]);
 			break;
-		}
 		case CMD0x03:
 			break;
 		case CMD0x07:
@@ -197,6 +200,7 @@ static inline void OBD_decode(OBD_t *obd)
 			break;
 		default:
 			break;
+		}
 	}
 }
 

@@ -34,13 +34,13 @@ static void thread_func(void *data)
 
 	connect(net->socket,(struct sockaddr*)&net->address,sizeof(net->address));
 		printf("%s:%d\n",__func__,__LINE__);
-//	for(i = 0; i < 10000;i++)
+	for(i = 0; i < 1000;i++)
 	{
-		usleep(1);
+		usleep(3);
 		memset(sendbuf,0,512);
 		memset(buffer,0,512);
 //		sprintf(sendbuf,"AA111111BB8111F%d11EE",j);
-		sprintf(sendbuf,"BB02123456780102030420EE");
+		sprintf(sendbuf,"BB02123456780102030400EE");
 		j++;
 		if(j == 10)
 			j=1;
