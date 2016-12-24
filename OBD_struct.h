@@ -148,8 +148,7 @@ static inline void OBD_decode(OBD_t *obd)
 		{
 			cmd02_t *cmd = (cmd02_t*)obd->hex;
 //			printf("client_id len =%d\n",sizeof(cmd->head.id));
-			u8_t len = sizeof(cmd->head.id);
-			__cmd_count++;
+//			u8_t len = sizeof(cmd->head.id);
 //			printf("[%d]: %s\n",__cmd_count,obd->data);
 //			for(i = 0; i < len; i++)
 //				printf("client_id[%d] = 0x%2x\n",i,cmd->head.id[i]);

@@ -84,7 +84,6 @@ void read_func_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 	else if(read == 0)
 	{
 		OBD_release(obd);
-		printf("%s:%d count = %d\n",__func__,__LINE__,__cmd_count);
 		free_libev(loop,w->fd);
 		return;
 	}
@@ -107,8 +106,9 @@ void read_func_cb(struct ev_loop *loop, struct ev_io *w, int revents)
 	send(w->fd,"OK",strlen("OK"),0);
 	obd->data_length = len;
 	list_init(&obd->list);
-	mq_put(&obd_mq,&obd->list);
-//	threadpool_add(thread_pool,OBD_decode_thread,(void*)obd,0);
+//	mq_put(&obd_mq,&obd->list);
+//		OBD_release(obd);
+	threadpool_add(thread_pool,OBD_decode_thread,(void*)obd,0);
 	return;
 }
 
@@ -160,32 +160,9 @@ void OBD_decode_thread(void *data)
 {
 	OBD_t *o = (OBD_t*)data;
 	OBD_filter_escape_and_transfer_to_hex(o);
-//	printf("cmd = 0x%x\n",o->hex[1]);
+//	printf(" %s\n",o->data);
 	OBD_decode(o);
 	OBD_release(o);
-}
-
-void* thread_func_cb(void *data)
-{
-	OBD_t *o = NULL;
-	list_t *list = NULL;
-	while(1)
-	{
-		sleep(10);
-		if(mq_flag == TRUE && mq_is_empty(&obd_mq) == TRUE)
-			break;
-		if((list = mq_get(&obd_mq)) == NULL)
-			continue;
-		if((o = list_entry(list,OBD_t,list)) == NULL)
-		{
-			printf("o is NULL\n");
-			continue;
-		}
-//		threadpool_add(thread_pool,OBD_decode_thread,(void*)o,0);
-		OBD_decode_thread((void*)o);
-	}
-	printf("exit thread\n");
-	return (void*)NULL;
 }
 
 int main(int argv, char **argc)
@@ -202,8 +179,7 @@ int main(int argv, char **argc)
 	if((ev_pool = CreateMemoryPool(sizeof(struct ev_io))) == NULL)return 1;
 	if((obd_pool = CreateMemoryPool(sizeof(OBD_t))) == NULL) return 1;
 
-//	thread_pool = threadpool_create(4,4,0);
-	pthread_create(&thread,NULL,thread_func_cb,NULL);
+	thread_pool = threadpool_create(32,128,0);
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
@@ -224,10 +200,8 @@ int main(int argv, char **argc)
 	ev_io_start(loop,&socket_accept);
 	ev_run(loop,0);
 	
-	mq_flag = TRUE;
-	pthread_join(thread,NULL);
 	close(server_socket);
-//	threadpool_destroy(thread_pool,0);
+	threadpool_destroy(thread_pool,0);
 	DestroyMemoryPool(&obd_pool);
 	DestroyMemoryPool(&ev_pool);
 	pthread_mutex_destroy(&mq_mutex);
