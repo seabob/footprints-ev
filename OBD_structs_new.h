@@ -51,7 +51,7 @@ typedef struct OBD_cmd0x00{
 	u8_t imsi[15];
 	u8_t hw_version[2];
 	u8_t sw_version[2];
-	u8_t car_type_code[2];
+	u8_t protocol_type[2];
 	end_t end;
 }cmd00_t;
 
